@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15
+    container_name: minka_db
+    restart: always
+    environment:
+      POSTGRES_USER: minka
+      POSTGRES_PASSWORD: minka
+      POSTGRES_DB: minka_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - minka_data:/var/lib/postgresql/data
+
+volumes:
+  minka_data:
