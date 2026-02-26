@@ -1,18 +1,9 @@
 from __future__ import annotations
-
 from logging.config import fileConfig
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-
-# ✅ Usa el mismo settings que tu app (lee .env)
 from app.core.config import settings
-
-# ✅ Usa el mismo Base que tus modelos
 from app.db.base import Base
-
-# ✅ Importa modelos para que queden registrados en Base.metadata
-#    (no importa si no los "usas" directamente; es para autogenerate)
 import app.db.models  # noqa: F401
 
 # Alembic Config object (lee alembic.ini)
