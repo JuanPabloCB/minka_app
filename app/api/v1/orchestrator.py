@@ -17,32 +17,25 @@ router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 @router.post("/message", response_model=OrchestratorMessageOut)
 def post_message(payload: OrchestratorMessageIn, db: Session = Depends(get_db)):
     try:
-        user_id, assistant_id, reply = create_user_and_assistant_messages(
-            db,
-            session_id=payload.session_id,
-            user_text=payload.content,
-        )
+        result = orchestrator_turn(db, session_id=payload.session_id, user_text=payload.content)
+
         return OrchestratorMessageOut(
             session_id=payload.session_id,
-            user_message_id=user_id,
-            assistant_message_id=assistant_id,
-            reply=reply,
+            user_message_id=result["user_msg"].id,
+            assistant_message_id=result["assistant_msg"].id,
+            reply=result["reply"],
+            created_at=result["assistant_msg"].created_at,
+            ui_hints=result.get("ui_hints"),
         )
 
     except ValueError as e:
         if str(e) == "SESSION_NOT_FOUND":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found",
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
         raise HTTPException(status_code=400, detail="Bad request")
-
     except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error",
-        )
+        raise HTTPException(status_code=500, detail="Database error")
     
+
 @router.post("/turn/{session_id}", response_model=OrchestratorTurnOut)
 def turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(get_db)):
     try:
@@ -58,6 +51,7 @@ def turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(ge
             plan_created=result["plan_created"],
             plan_id=result["plan_id"],
             plan_status=result["plan_status"],
+            ui_hints=result.get("ui_hints"),
         )
 
     except ValueError as e:
