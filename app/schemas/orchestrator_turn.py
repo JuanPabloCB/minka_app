@@ -35,6 +35,20 @@ class UIHintsOut(BaseModel):
     hints: list[UIHint] = Field(default_factory=list)
 
 
+# ---------- UI BULLETS (lista / timeline) ----------
+
+UIBulletsVariant = Literal["timeline", "bullets"]
+
+class UIBulletItem(BaseModel):
+    key: str
+    label: str
+
+class UIBulletsOut(BaseModel):
+    title: str | None = None
+    variant: UIBulletsVariant = "timeline"
+    items: list[UIBulletItem] = Field(default_factory=list)
+
+
 # ---------- TURN OUT ----------
 
 class OrchestratorTurnOut(BaseModel):
@@ -56,6 +70,9 @@ class OrchestratorTurnOut(BaseModel):
 
     # NUEVO: hints para UI (botones)
     ui_hints: UIHintsOut = Field(default_factory=UIHintsOut)
+
+    # NUEVO: bullets para UI (lista / timeline)
+    ui_bullets: UIBulletsOut | None = None
 
     class Config:
         from_attributes = True

@@ -1,0 +1,257 @@
+[1mdiff --git a/app/api/v1/orchestrator.py b/app/api/v1/orchestrator.py[m
+[1mindex 981032d..8145bcc 100644[m
+[1m--- a/app/api/v1/orchestrator.py[m
+[1m+++ b/app/api/v1/orchestrator.py[m
+[36m@@ -52,6 +52,7 @@[m [mdef turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(ge[m
+             plan_id=result["plan_id"],[m
+             plan_status=result["plan_status"],[m
+             ui_hints=result.get("ui_hints"),[m
+[32m+[m[32m            ui_bullets=result.get("ui_bullets"),[m
+         )[m
+ [m
+     except ValueError as e:[m
+[1mdiff --git a/app/schemas/orchestrator_turn.py b/app/schemas/orchestrator_turn.py[m
+[1mindex c7333e4..ee390bd 100644[m
+[1m--- a/app/schemas/orchestrator_turn.py[m
+[1m+++ b/app/schemas/orchestrator_turn.py[m
+[36m@@ -35,6 +35,20 @@[m [mclass UIHintsOut(BaseModel):[m
+     hints: list[UIHint] = Field(default_factory=list)[m
+ [m
+ [m
+[32m+[m[32m# ---------- UI BULLETS (lista / timeline) ----------[m
+[32m+[m
+[32m+[m[32mUIBulletsVariant = Literal["timeline", "bullets"][m
+[32m+[m
+[32m+[m[32mclass UIBulletItem(BaseModel):[m
+[32m+[m[32m    key: str[m
+[32m+[m[32m    label: str[m
+[32m+[m
+[32m+[m[32mclass UIBulletsOut(BaseModel):[m
+[32m+[m[32m    title: str | None = None[m
+[32m+[m[32m    variant: UIBulletsVariant = "timeline"[m
+[32m+[m[32m    items: list[UIBulletItem] = Field(default_factory=list)[m
+[32m+[m
+[32m+[m
+ # ---------- TURN OUT ----------[m
+ [m
+ class OrchestratorTurnOut(BaseModel):[m
+[36m@@ -57,5 +71,8 @@[m [mclass OrchestratorTurnOut(BaseModel):[m
+     # NUEVO: hints para UI (botones)[m
+     ui_hints: UIHintsOut = Field(default_factory=UIHintsOut)[m
+ [m
+[32m+[m[32m    # NUEVO: bullets para UI (lista / timeline)[m
+[32m+[m[32m    ui_bullets: UIBulletsOut | None = None[m
+[32m+[m
+     class Config:[m
+         from_attributes = True[m
+\ No newline at end of file[m
+[1mdiff --git a/app/services/orchestrator_llm_service.py b/app/services/orchestrator_llm_service.py[m
+[1mindex 0154f64..000452f 100644[m
+[1m--- a/app/services/orchestrator_llm_service.py[m
+[1m+++ b/app/services/orchestrator_llm_service.py[m
+[36m@@ -23,6 +23,18 @@[m [mRegla clave (MVP):[m
+ - Si ya entiendes la meta, primero pide confirmación final con un resumen.[m
+ - Solo después de que el usuario confirme, ya NO pidas más preguntas y deja lista la ruta.[m
+ [m
+[32m+[m[32mPrioridad MVP:[m
+[32m+[m[32m- Antes de pedir confirmación final, debes tener definidos: input_source y output_format.[m
+[32m+[m[32m- Si falta alguno, NO pidas confirmación final todavía: pregunta o guía al usuario para definirlo y marca missing_fields.[m
+[32m+[m[32m- Evita preguntas de analista/dominio (residencial vs comercial, garantías, penalidades, renegociación). Eso lo hace el analista del plan.[m
+[32m+[m[32m- Si faltan varios campos en missing_fields, pregunta SOLO por 1 campo por turno.[m
+[32m+[m[32m- Prioridad: input_source primero, luego output_format.[m
+[32m+[m[32m- No incluyas ejemplos de formatos o integraciones dentro del reply; esas listas las muestra el frontend vía ui_bullets/ui_hints.[m
+[32m+[m[32m- Si el usuario elige un método de input aún no implementado (upload, drive, paste_text_to_txt), responde que está "próximamente" y pide que, por ahora, describa brevemente el contenido y el objetivo.[m
+[32m+[m[32m- NO afirmes que realizaste integraciones (no "ya importé", no "ya descargué").[m
+[32m+[m[32m- Prohibido usar frases tipo "por ejemplo", "ej:", "como", o listar opciones dentro del reply. Si necesitas mostrar opciones, usa missing_fields para que el frontend muestre ui_bullets/ui_hints.[m
+[32m+[m
+[32m+[m
+ Responde SIEMPRE en JSON válido con esta estructura (sin texto extra, sin markdown):[m
+ [m
+ {[m
+[36m@@ -30,6 +42,7 @@[m [mResponde SIEMPRE en JSON válido con esta estructura (sin texto extra, sin markd[m
+   "meta_understood": true/false,[m
+   "missing_fields": ["campo1", "campo2"],[m
+   "needs_confirmation": true/false,[m
+[32m+[m[32m  "understanding_steps":["item 1", "item 2"],[m
+   "plan_title": "titulo corto de la ruta",[m
+   "plan_steps": ["paso 1", "paso 2", "paso 3"],[m
+   "confidence": 0.0-1.0[m
+[36m@@ -39,6 +52,14 @@[m [mNotas:[m
+ - missing_fields puede estar vacío.[m
+ - needs_confirmation = true cuando ya entiendes pero falta el “¿confirmas que esto es todo?”[m
+ - plan_steps deben ser GENERALES (tipo 5-7 pasos), no acciones técnicas.[m
+[32m+[m[32m- Puedes hacer 1 o 2 preguntas estratégicas por turno, pero prioriza cerrar missing_fields.[m
+[32m+[m[32m- understanding_steps: cuando needs_confirmation=true, incluye 2-5 bullets que resuman lo entendido (alto nivel).[m
+[32m+[m[32m- Si falta definir de dónde vendrá el input/documento, agrega "input_source" en missing_fields.[m
+[32m+[m[32m- Si falta definir el tipo de entrega/formato de salida, agrega "output_format" en missing_fields.[m
+[32m+[m[32m- Solo cuando missing_fields esté vacío y la meta esté entendida, usa needs_confirmation=true.[m
+[32m+[m[32m- Si vas a preguntar por el formato de salida, debes incluir "output_format" en missing_fields.[m
+[32m+[m[32m- Si vas a preguntar por el input, debes incluir "input_source" en missing_fields.[m
+[32m+[m
+ """.strip()[m
+ [m
+ [m
+[36m@@ -110,6 +131,11 @@[m [mdef _normalize_result(parsed: Dict[str, Any], raw_output: str) -> Dict[str, Any][m
+ [m
+     needs_confirmation = bool(parsed.get("needs_confirmation", False))[m
+ [m
+[32m+[m[32m    understanding_steps = parsed.get("understanding_steps", [])[m
+[32m+[m[32m    if not isinstance(understanding_steps, list):[m
+[32m+[m[32m        understanding_steps = [][m
+[32m+[m[32m    understanding_steps = [str(s).strip() for s in understanding_steps if str(s).strip()][m
+[32m+[m
+     plan_title = parsed.get("plan_title", "")[m
+     if not isinstance(plan_title, str):[m
+         plan_title = ""[m
+[36m@@ -132,6 +158,7 @@[m [mdef _normalize_result(parsed: Dict[str, Any], raw_output: str) -> Dict[str, Any][m
+         "meta_understood": meta_understood,[m
+         "missing_fields": missing_fields,[m
+         "needs_confirmation": needs_confirmation,[m
+[32m+[m[32m        "understanding_steps": understanding_steps,[m
+         "plan_title": plan_title,[m
+         "plan_steps": plan_steps,[m
+         "confidence": confidence,[m
+[1mdiff --git a/app/services/orchestrator_turn_service.py b/app/services/orchestrator_turn_service.py[m
+[1mindex 6999a9b..9bcee88 100644[m
+[1m--- a/app/services/orchestrator_turn_service.py[m
+[1m+++ b/app/services/orchestrator_turn_service.py[m
+[36m@@ -10,6 +10,7 @@[m [mfrom app.services.orchestrator_llm_service import call_orchestrator_llm[m
+ from app.services.orchestrator_messages_service import create_message[m
+ from app.db.models.orchestrator_message import OrchestratorMessage[m
+ from app.services.plans_service import create_draft_plan, list_plans_by_session[m
+[32m+[m[32mfrom app.core.constants import UI_BULLETS_CATALOG[m
+ [m
+ [m
+ MAX_HISTORY_MESSAGES = 12  # total (user+assistant)[m
+[36m@@ -44,15 +45,28 @@[m [mdef _build_ui_hints([m
+                 "type": "tool_select",[m
+                 "title": "¿De dónde viene tu información (input) por ahora?",[m
+                 "options": [[m
+[31m-                    {"key": "gmail", "label": "Gmail", "value": "gmail", "enabled": True},[m
+[31m-                    {"key": "drive", "label": "Google Drive", "value": "drive", "enabled": True},[m
+[31m-                    {"key": "outlook", "label": "Outlook", "value": "outlook", "enabled": True},[m
+[31m-                    {"key": "upload", "label": "Subir archivo", "value": "upload", "enabled": True},[m
+[32m+[m[32m                      {"key": "paste_text", "label": "Pegar texto en el chat", "value": "paste_text", "enabled": True, "reason": "Próximamente"},[m
+[32m+[m[32m                      {"key": "local_upload", "label": "Subir archivo", "value": "local_upload", "enabled": True, "reason": "Próximamente"},[m
+[32m+[m[32m                      {"key": "google_drive", "label": "Google Drive", "value": "google_drive", "enabled": True, "reason": "Próximamente"},[m
+                 ],[m
+                 "meta": {"field": "input_source"},[m
+             }[m
+         )[m
+ [m
+[32m+[m[32m    # 1b) Si falta output_format, ofrecer selección de formato de exportación[m
+[32m+[m[32m    if "output_format" in missing_fields_norm or "output" in missing_fields_norm:[m
+[32m+[m[32m        hints.append([m
+[32m+[m[32m            {[m
+[32m+[m[32m                "type": "tool_select",[m
+[32m+[m[32m                "title": "¿En qué formato quieres el resultado?",[m
+[32m+[m[32m                "options": [[m
+[32m+[m[32m                    {"key": "pdf", "label": "PDF", "value": "pdf", "enabled": True},[m
+[32m+[m[32m                    {"key": "docx", "label": "Word (.docx)", "value": "docx", "enabled": True},[m
+[32m+[m[32m                ],[m
+[32m+[m[32m                "meta": {"field": "output_format"},[m
+[32m+[m[32m            }[m
+[32m+[m[32m    )[m
+[32m+[m
+     # 2) Si estamos en fase de confirmación final: quick replies[m
+     #    (esto es EXACTAMENTE el “Sí/No” que quieres mientras chateas)[m
+     if meta_understood and needs_confirmation and not cta_ready:[m
+[36m@@ -88,6 +102,62 @@[m [mdef _build_ui_hints([m
+ [m
+     return {"hints": hints}[m
+ [m
+[32m+[m[32m#bullets[m
+[32m+[m[32mdef _catalog_bullets(key: str) -> dict[str, Any] | None:[m
+[32m+[m[32m    data = UI_BULLETS_CATALOG.get(key)[m
+[32m+[m[32m    if not data:[m
+[32m+[m[32m        return None[m
+[32m+[m[32m    items = data.get("items") or [][m
+[32m+[m[32m    return {[m
+[32m+[m[32m        "title": data.get("title"),[m
+[32m+[m[32m        "variant": data.get("variant", "bullets"),[m
+[32m+[m[32m        "items": [{"key": f"{key}_{i+1}", "label": str(x)} for i, x in enumerate(items) if str(x).strip()],[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32mdef _build_ui_bullets([m
+[32m+[m[32m    *,[m
+[32m+[m[32m    llm_result: dict[str, Any],[m
+[32m+[m[32m    meta_understood: bool,[m
+[32m+[m[32m    needs_confirmation: bool,[m
+[32m+[m[32m    cta_ready: bool,[m
+[32m+[m[32m) -> dict[str, Any] | None:[m
+[32m+[m[32m    # 1) Confirmación (IA)[m
+[32m+[m[32m    if meta_understood and needs_confirmation and not cta_ready:[m
+[32m+[m[32m        items = llm_result.get("ui_bullets_items") or llm_result.get("understanding_steps") or [][m
+[32m+[m[32m        if not isinstance(items, list):[m
+[32m+[m[32m            items = [][m
+[32m+[m[32m        items = [str(x).strip() for x in items if str(x).strip()][m
+[32m+[m[32m        if not items:[m
+[32m+[m[32m            return None[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            "title": "Parece que quieres:",[m
+[32m+[m[32m            "variant": "timeline",[m
+[32m+[m[32m            "items": [{"key": f"step_{i+1}", "label": text} for i, text in enumerate(items)],[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    # 2) Bullets fijos por KEY explícita (ej: "available_integrations")[m
+[32m+[m[32m    bullets_key = llm_result.get("ui_bullets_key")[m
+[32m+[m[32m    if isinstance(bullets_key, str) and bullets_key.strip():[m
+[32m+[m[32m        block = _catalog_bullets(bullets_key.strip())[m
+[32m+[m[32m        if block:[m
+[32m+[m[32m            return block[m
+[32m+[m
+[32m+[m[32m    # 3) Bullets fijos por ESTADO (si falta input/source)[m
+[32m+[m[32m    missing_fields = llm_result.get("missing_fields") or [][m
+[32m+[m[32m    if not isinstance(missing_fields, list):[m
+[32m+[m[32m        missing_fields = [][m
+[32m+[m[32m    missing_norm = {str(x).strip().lower() for x in missing_fields if str(x).strip()}[m
+[32m+[m
+[32m+[m[32m    wants_input = any(k in missing_norm for k in {"input", "inputs", "input_source", "source", "fuente", "canal"})[m
+[32m+[m[32m    if wants_input:[m
+[32m+[m[41m        [m
+[32m+[m[32m        return _catalog_bullets("available_inputs")[m
+[32m+[m[41m    [m
+[32m+[m[32m    wants_output = any(k in missing_norm for k in {"output_format", "output", "formato_salida", "salida"})[m
+[32m+[m[32m    if wants_output:[m
+[32m+[m[32m        return _catalog_bullets("supported_output_formats")[m
+[32m+[m
+[32m+[m[32m    return None[m
+ [m
+ def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str, Any]:[m
+     # 1) Guardar user message[m
+[36m@@ -171,6 +241,14 @@[m [mdef orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str[m
+         cta_ready=cta_ready,[m
+     )[m
+ [m
+[32m+[m[32m    # 7) UI Bullets (lista/timeline)[m
+[32m+[m[32m    ui_bullets = _build_ui_bullets([m
+[32m+[m[32m        llm_result=llm_result,[m
+[32m+[m[32m        meta_understood=meta_understood,[m
+[32m+[m[32m        needs_confirmation=needs_confirmation,[m
+[32m+[m[32m        cta_ready=cta_ready,[m
+[32m+[m[32m    )[m
+[32m+[m
+     return {[m
+         "user_msg": user_msg,[m
+         "assistant_msg": assistant_msg,[m
+[36m@@ -180,6 +258,7 @@[m [mdef orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str[m
+         "plan_id": plan_id,[m
+         "plan_status": plan_status,[m
+         "ui_hints": ui_hints,[m
+[32m+[m[32m        "ui_bullets": ui_bullets,[m
+         # debug:[m
+         "meta_understood": meta_understood,[m
+         "needs_confirmation": needs_confirmation,[m
+[1mdiff --git a/docker-compose.yml b/docker-compose.yml[m
+[1mindex 5b25cdc..6d088ac 100644[m
+[1m--- a/docker-compose.yml[m
+[1m+++ b/docker-compose.yml[m
+[36m@@ -8,7 +8,7 @@[m [mservices:[m
+       POSTGRES_PASSWORD: minka[m
+       POSTGRES_DB: minka_db[m
+     ports:[m
+[31m-      - "5432:5432"[m
+[32m+[m[32m      - "5434:5432"[m
+     volumes:[m
+       - minka_data:/var/lib/postgresql/data[m
+ [m

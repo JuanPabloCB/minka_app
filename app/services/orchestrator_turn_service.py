@@ -10,6 +10,7 @@ from app.services.orchestrator_llm_service import call_orchestrator_llm
 from app.services.orchestrator_messages_service import create_message
 from app.db.models.orchestrator_message import OrchestratorMessage
 from app.services.plans_service import create_draft_plan, list_plans_by_session
+from app.core.constants import UI_BULLETS_CATALOG
 
 
 MAX_HISTORY_MESSAGES = 12  # total (user+assistant)
@@ -44,14 +45,27 @@ def _build_ui_hints(
                 "type": "tool_select",
                 "title": "¿De dónde viene tu información (input) por ahora?",
                 "options": [
-                    {"key": "gmail", "label": "Gmail", "value": "gmail", "enabled": True},
-                    {"key": "drive", "label": "Google Drive", "value": "drive", "enabled": True},
-                    {"key": "outlook", "label": "Outlook", "value": "outlook", "enabled": True},
-                    {"key": "upload", "label": "Subir archivo", "value": "upload", "enabled": True},
+                      {"key": "paste_text", "label": "Pegar texto en el chat", "value": "paste_text", "enabled": True, "reason": "Próximamente"},
+                      {"key": "local_upload", "label": "Subir archivo", "value": "local_upload", "enabled": True, "reason": "Próximamente"},
+                      {"key": "google_drive", "label": "Google Drive", "value": "google_drive", "enabled": True, "reason": "Próximamente"},
                 ],
                 "meta": {"field": "input_source"},
             }
         )
+
+    # 1b) Si falta output_format, ofrecer selección de formato de exportación
+    if "output_format" in missing_fields_norm or "output" in missing_fields_norm:
+        hints.append(
+            {
+                "type": "tool_select",
+                "title": "¿En qué formato quieres el resultado?",
+                "options": [
+                    {"key": "pdf", "label": "PDF", "value": "pdf", "enabled": True},
+                    {"key": "docx", "label": "Word (.docx)", "value": "docx", "enabled": True},
+                ],
+                "meta": {"field": "output_format"},
+            }
+    )
 
     # 2) Si estamos en fase de confirmación final: quick replies
     #    (esto es EXACTAMENTE el “Sí/No” que quieres mientras chateas)
@@ -88,6 +102,62 @@ def _build_ui_hints(
 
     return {"hints": hints}
 
+#bullets
+def _catalog_bullets(key: str) -> dict[str, Any] | None:
+    data = UI_BULLETS_CATALOG.get(key)
+    if not data:
+        return None
+    items = data.get("items") or []
+    return {
+        "title": data.get("title"),
+        "variant": data.get("variant", "bullets"),
+        "items": [{"key": f"{key}_{i+1}", "label": str(x)} for i, x in enumerate(items) if str(x).strip()],
+    }
+
+def _build_ui_bullets(
+    *,
+    llm_result: dict[str, Any],
+    meta_understood: bool,
+    needs_confirmation: bool,
+    cta_ready: bool,
+) -> dict[str, Any] | None:
+    # 1) Confirmación (IA)
+    if meta_understood and needs_confirmation and not cta_ready:
+        items = llm_result.get("ui_bullets_items") or llm_result.get("understanding_steps") or []
+        if not isinstance(items, list):
+            items = []
+        items = [str(x).strip() for x in items if str(x).strip()]
+        if not items:
+            return None
+        return {
+            "title": "Parece que quieres:",
+            "variant": "timeline",
+            "items": [{"key": f"step_{i+1}", "label": text} for i, text in enumerate(items)],
+        }
+
+    # 2) Bullets fijos por KEY explícita (ej: "available_integrations")
+    bullets_key = llm_result.get("ui_bullets_key")
+    if isinstance(bullets_key, str) and bullets_key.strip():
+        block = _catalog_bullets(bullets_key.strip())
+        if block:
+            return block
+
+    # 3) Bullets fijos por ESTADO (si falta input/source)
+    missing_fields = llm_result.get("missing_fields") or []
+    if not isinstance(missing_fields, list):
+        missing_fields = []
+    missing_norm = {str(x).strip().lower() for x in missing_fields if str(x).strip()}
+
+    wants_input = any(k in missing_norm for k in {"input", "inputs", "input_source", "source", "fuente", "canal"})
+    if wants_input:
+        
+        return _catalog_bullets("available_inputs")
+    
+    wants_output = any(k in missing_norm for k in {"output_format", "output", "formato_salida", "salida"})
+    if wants_output:
+        return _catalog_bullets("supported_output_formats")
+
+    return None
 
 def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str, Any]:
     # 1) Guardar user message
@@ -171,6 +241,14 @@ def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str
         cta_ready=cta_ready,
     )
 
+    # 7) UI Bullets (lista/timeline)
+    ui_bullets = _build_ui_bullets(
+        llm_result=llm_result,
+        meta_understood=meta_understood,
+        needs_confirmation=needs_confirmation,
+        cta_ready=cta_ready,
+    )
+
     return {
         "user_msg": user_msg,
         "assistant_msg": assistant_msg,
@@ -180,6 +258,7 @@ def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str
         "plan_id": plan_id,
         "plan_status": plan_status,
         "ui_hints": ui_hints,
+        "ui_bullets": ui_bullets,
         # debug:
         "meta_understood": meta_understood,
         "needs_confirmation": needs_confirmation,

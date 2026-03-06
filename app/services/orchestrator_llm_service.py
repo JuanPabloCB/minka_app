@@ -23,6 +23,18 @@ Regla clave (MVP):
 - Si ya entiendes la meta, primero pide confirmación final con un resumen.
 - Solo después de que el usuario confirme, ya NO pidas más preguntas y deja lista la ruta.
 
+Prioridad MVP:
+- Antes de pedir confirmación final, debes tener definidos: input_source y output_format.
+- Si falta alguno, NO pidas confirmación final todavía: pregunta o guía al usuario para definirlo y marca missing_fields.
+- Evita preguntas de analista/dominio (residencial vs comercial, garantías, penalidades, renegociación). Eso lo hace el analista del plan.
+- Si faltan varios campos en missing_fields, pregunta SOLO por 1 campo por turno.
+- Prioridad: input_source primero, luego output_format.
+- No incluyas ejemplos de formatos o integraciones dentro del reply; esas listas las muestra el frontend vía ui_bullets/ui_hints.
+- Si el usuario elige un método de input aún no implementado (upload, drive, paste_text_to_txt), responde que está "próximamente" y pide que, por ahora, describa brevemente el contenido y el objetivo.
+- NO afirmes que realizaste integraciones (no "ya importé", no "ya descargué").
+- Prohibido usar frases tipo "por ejemplo", "ej:", "como", o listar opciones dentro del reply. Si necesitas mostrar opciones, usa missing_fields para que el frontend muestre ui_bullets/ui_hints.
+
+
 Responde SIEMPRE en JSON válido con esta estructura (sin texto extra, sin markdown):
 
 {
@@ -30,6 +42,7 @@ Responde SIEMPRE en JSON válido con esta estructura (sin texto extra, sin markd
   "meta_understood": true/false,
   "missing_fields": ["campo1", "campo2"],
   "needs_confirmation": true/false,
+  "understanding_steps":["item 1", "item 2"],
   "plan_title": "titulo corto de la ruta",
   "plan_steps": ["paso 1", "paso 2", "paso 3"],
   "confidence": 0.0-1.0
@@ -39,6 +52,14 @@ Notas:
 - missing_fields puede estar vacío.
 - needs_confirmation = true cuando ya entiendes pero falta el “¿confirmas que esto es todo?”
 - plan_steps deben ser GENERALES (tipo 5-7 pasos), no acciones técnicas.
+- Puedes hacer 1 o 2 preguntas estratégicas por turno, pero prioriza cerrar missing_fields.
+- understanding_steps: cuando needs_confirmation=true, incluye 2-5 bullets que resuman lo entendido (alto nivel).
+- Si falta definir de dónde vendrá el input/documento, agrega "input_source" en missing_fields.
+- Si falta definir el tipo de entrega/formato de salida, agrega "output_format" en missing_fields.
+- Solo cuando missing_fields esté vacío y la meta esté entendida, usa needs_confirmation=true.
+- Si vas a preguntar por el formato de salida, debes incluir "output_format" en missing_fields.
+- Si vas a preguntar por el input, debes incluir "input_source" en missing_fields.
+
 """.strip()
 
 
@@ -110,6 +131,11 @@ def _normalize_result(parsed: Dict[str, Any], raw_output: str) -> Dict[str, Any]
 
     needs_confirmation = bool(parsed.get("needs_confirmation", False))
 
+    understanding_steps = parsed.get("understanding_steps", [])
+    if not isinstance(understanding_steps, list):
+        understanding_steps = []
+    understanding_steps = [str(s).strip() for s in understanding_steps if str(s).strip()]
+
     plan_title = parsed.get("plan_title", "")
     if not isinstance(plan_title, str):
         plan_title = ""
@@ -132,6 +158,7 @@ def _normalize_result(parsed: Dict[str, Any], raw_output: str) -> Dict[str, Any]
         "meta_understood": meta_understood,
         "missing_fields": missing_fields,
         "needs_confirmation": needs_confirmation,
+        "understanding_steps": understanding_steps,
         "plan_title": plan_title,
         "plan_steps": plan_steps,
         "confidence": confidence,
