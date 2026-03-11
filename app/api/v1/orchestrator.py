@@ -53,6 +53,7 @@ def turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(ge
             plan_status=result["plan_status"],
             ui_hints=result.get("ui_hints"),
             ui_bullets=result.get("ui_bullets"),
+            ui_context=result.get("ui_context"),
         )
 
     except ValueError as e:

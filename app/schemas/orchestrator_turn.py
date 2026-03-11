@@ -48,6 +48,16 @@ class UIBulletsOut(BaseModel):
     variant: UIBulletsVariant = "timeline"
     items: list[UIBulletItem] = Field(default_factory=list)
 
+class UIContextOut(BaseModel):
+    task_type: str | None = None
+    document_type: str | None = None
+    analysis_goal: str | None = None
+    input_source: str | None = None
+    input_file_name: str | None = None
+    output_format: str | None = None
+    focus: list[str] = Field(default_factory=list)
+    
+
 
 # ---------- TURN OUT ----------
 
@@ -73,6 +83,10 @@ class OrchestratorTurnOut(BaseModel):
 
     # NUEVO: bullets para UI (lista / timeline)
     ui_bullets: UIBulletsOut | None = None
+    
+    #NUEVO: Contexto segun MinkaBot
+    ui_context: UIContextOut | None = None
 
     class Config:
         from_attributes = True
+    
