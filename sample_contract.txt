@@ -1,0 +1,47 @@
+1. Object of the Contract
+
+This Agreement establishes the terms and conditions under which the Service Provider agrees to deliver consulting services to the Client. The services may include technical consulting, strategic analysis, and implementation support as agreed by both parties in writing.
+
+2. Scope of Services
+
+The Service Provider shall perform all services described in Annex A of this Agreement. Any modification or extension of the services must be approved in writing by both parties. The Service Provider agrees to perform the services with due diligence and professional care.
+
+3. Duration of the Agreement
+
+This Agreement shall commence on the Effective Date and shall remain in force for a period of twelve (12) months unless terminated earlier in accordance with the provisions set forth in this Agreement.
+
+4. Payment Terms
+
+The Client agrees to pay the Service Provider a monthly fee of USD 3,000 for the services rendered. Payments shall be made within fifteen (15) days after receipt of the invoice. Late payments may be subject to interest at a rate of 1.5% per month.
+
+5. Confidentiality
+
+Both parties agree to maintain strict confidentiality regarding any proprietary or sensitive information disclosed during the execution of this Agreement. Confidential information shall not be disclosed to any third party without prior written consent of the other party.
+
+6. Intellectual Property
+
+All intellectual property created during the course of the services shall belong to the Client unless otherwise specified in writing. The Service Provider may not reuse, distribute, or commercialize any deliverables without the explicit authorization of the Client.
+
+7. Limitation of Liability
+
+The Service Provider shall not be liable for any indirect, incidental, or consequential damages arising from the use of the services provided under this Agreement. The total liability of the Service Provider shall not exceed the total amount paid by the Client during the previous six months.
+
+8. Termination
+
+Either party may terminate this Agreement with thirty (30) days written notice to the other party. Immediate termination may occur if one party materially breaches the terms of this Agreement and fails to cure such breach within ten (10) days of written notice.
+
+9. Governing Law
+
+This Agreement shall be governed by and interpreted in accordance with the laws of the jurisdiction where the Client's headquarters are located.
+
+10. Dispute Resolution
+
+Any dispute arising from or related to this Agreement shall be resolved through negotiation between the parties. If negotiation fails, the dispute shall be submitted to binding arbitration under the rules of the International Arbitration Center.
+
+11. Force Majeure
+
+Neither party shall be held responsible for failure or delay in performing obligations if such failure results from events beyond reasonable control, including but not limited to natural disasters, war, government actions, or labor disputes.
+
+12. Entire Agreement
+
+This Agreement constitutes the entire agreement between the parties and supersedes any prior agreements, negotiations, or understandings, whether written or oral.
