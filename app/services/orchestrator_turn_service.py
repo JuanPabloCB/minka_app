@@ -189,7 +189,7 @@ def _build_ui_bullets(
 
 def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str, Any]:
     # 1) Guardar user message
-    user_msg = create_message(db, session_id=session_id, role="user", content=user_text)
+    user_msg = create_message(db, session_id=session_id, role="user", content=user_text, meta={},)
 
     # 2) Traer historial completo (user + assistant)
     messages = (
@@ -358,8 +358,6 @@ def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str
         plan_steps = []
     plan_steps = [str(s).strip() for s in plan_steps if str(s).strip()]
 
-    # 4) Guardar assistant message
-    assistant_msg = create_message(db, session_id=session_id, role="assistant", content=reply)
 
     # 5) CTA + Plan (solo si user confirmó y no falta nada)
     cta_ready = False
@@ -403,6 +401,30 @@ def orchestrator_turn(db: Session, session_id: UUID, user_text: str) -> dict[str
         meta_understood=meta_understood,
         needs_confirmation=needs_confirmation,
         cta_ready=cta_ready,
+    )
+
+        # 4) Guardar assistant message
+    assistant_meta = {
+    "ui_hints": ui_hints,
+    "ui_bullets": ui_bullets,
+    "ui_context": llm_result.get("ui_context"),
+    "meta_understood": meta_understood,
+    "missing_fields": missing_fields_norm,
+    "needs_confirmation": needs_confirmation,
+    "understanding_steps": llm_result.get("understanding_steps") or [],
+    "confidence": confidence,
+    "cta_ready": cta_ready,
+    "plan_created": plan_created,
+    "plan_id": str(plan_id) if plan_id else None,
+    "plan_status": plan_status,
+    }
+
+    assistant_msg = create_message(
+    db,
+    session_id=session_id,
+    role="assistant",
+    content=reply,
+    meta=assistant_meta,
     )
 
     return {

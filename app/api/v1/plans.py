@@ -19,6 +19,10 @@ from app.schemas.plans import (
     PlanSetUIStateIn,
     PlanSetSelectedAnalystsIn,
     PlanMetaPatchIn,
+    ExecutionRouteOut,
+    ExecutionRouteStepOut,
+    AnalystActionStepOut,
+    SourceStepAssignmentOut,
 )
 from app.services.plans_service import (
     create_draft_plan,
@@ -30,6 +34,7 @@ from app.services.plans_service import (
     set_plan_selected_analysts,
     merge_plan_meta,
 )
+from app.services.execution_route_service import get_execution_route
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -91,6 +96,65 @@ def read_plan(plan_id: UUID, db: Session = Depends(get_db)):
         return PlanWithStepsOut(
             plan=PlanOut.model_validate(plan),
             steps=[PlanStepOut.model_validate(s) for s in steps],
+        )
+
+    except ValueError as e:
+        if str(e) == "PLAN_NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Plan not found")
+        raise HTTPException(status_code=400, detail="Bad request")
+
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Database error")
+    
+
+@router.get("/{plan_id}/execution-route", response_model=ExecutionRouteOut)
+def read_execution_route(plan_id: UUID, db: Session = Depends(get_db)):
+    """
+    Devuelve la ruta de ejecución derivada desde plan + plan_steps.
+    V1:
+    - todos los steps se asignan a legal_analyst
+    - los consecutivos del mismo analista se agrupan
+    - no ejecuta analistas reales todavía
+    """
+    try:
+        result = get_execution_route(db, plan_id=plan_id)
+
+        return ExecutionRouteOut(
+            plan=PlanOut.model_validate(result.plan),
+            progress_percent=result.progress_percent,
+            execution_status=result.execution_status,
+            estimated_total_minutes=result.estimated_total_minutes,
+            execution_steps=[
+                ExecutionRouteStepOut(
+                    index=step.index,
+                    analyst_key=step.analyst_key,
+                    analyst_label=step.analyst_label,
+                    status=step.status,
+                    estimated_minutes=step.estimated_minutes,
+                    task_titles=step.task_titles,
+                    source_step_indexes=step.source_step_indexes,
+                    source_step_assignments=[
+                        SourceStepAssignmentOut(
+                            step_index=assignment.step_index,
+                            title=assignment.title,
+                            analyst_key=assignment.analyst_key,
+                            analyst_label=assignment.analyst_label,
+                        )
+                        for assignment in step.source_step_assignments
+                    ],
+                    analyst_actions=[
+                        AnalystActionStepOut(
+                            key=action.key,
+                            label=action.label,
+                            status=action.status,
+                            estimated_minutes=action.estimated_minutes,
+                        )
+                        for action in step.analyst_actions
+                    ],
+                    expected_output=step.expected_output,
+                )
+                for step in result.execution_steps
+            ],
         )
 
     except ValueError as e:

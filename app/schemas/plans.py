@@ -58,6 +58,39 @@ class PlanWithStepsOut(BaseModel):
     plan: PlanOut
     steps: list[PlanStepOut]
 
+class AnalystActionStepOut(BaseModel):
+    key: str
+    label: str
+    status: str
+    estimated_minutes: int
+
+
+class SourceStepAssignmentOut(BaseModel):
+    step_index: int
+    title: str
+    analyst_key: str
+    analyst_label: str
+
+
+class ExecutionRouteStepOut(BaseModel):
+    index: int
+    analyst_key: str
+    analyst_label: str
+    status: str
+    estimated_minutes: int
+    task_titles: list[str] = Field(default_factory=list)
+    source_step_indexes: list[int] = Field(default_factory=list)
+    source_step_assignments: list[SourceStepAssignmentOut] = Field(default_factory=list)
+    analyst_actions: list[AnalystActionStepOut] = Field(default_factory=list)
+    expected_output: str = Field(default="")
+
+
+class ExecutionRouteOut(BaseModel):
+    plan: PlanOut
+    progress_percent: int
+    execution_status: str
+    estimated_total_minutes: int
+    execution_steps: list[ExecutionRouteStepOut] = Field(default_factory=list)
 
 class PlanListOut(BaseModel):
     plans: list[PlanOut]
