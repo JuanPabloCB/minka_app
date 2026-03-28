@@ -30,3 +30,4 @@ class OrchestratorSession(Base):
 
     messages = relationship("OrchestratorMessage", back_populates="session", cascade="all, delete-orphan")
     plans = relationship("Plan", back_populates="session", cascade="all, delete-orphan")
+    uploaded_files = relationship("UploadedFile", back_populates="session", cascade="all, delete-orphan")

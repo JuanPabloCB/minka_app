@@ -8,8 +8,16 @@ from app.db.deps import get_db
 from app.schemas.orchestrator import OrchestratorMessageIn, OrchestratorMessageOut
 from app.services.orchestrator_service import create_user_and_assistant_messages
 
-from app.schemas.orchestrator_turn import OrchestratorTurnIn, OrchestratorTurnOut
-from app.services.orchestrator_turn_service import orchestrator_turn
+from app.schemas.orchestrator_turn import (
+    OrchestratorTurnIn,
+    OrchestratorTurnOut,
+    OrchestratorFileIntakeCompleteIn,
+    OrchestratorFileIntakeCompleteOut,
+)
+from app.services.orchestrator_turn_service import (
+    orchestrator_turn,
+    complete_file_intake_turn,
+)
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 
@@ -47,6 +55,9 @@ def turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(ge
             assistant_message_id=result["assistant_msg"].id,
             reply=result["reply"],
             created_at=result["assistant_msg"].created_at,
+            active_step=result["active_step"],
+            interaction_mode=result["interaction_mode"],
+            confirmation_state=result["confirmation_state"],
             cta_ready=result["cta_ready"],
             plan_created=result["plan_created"],
             plan_id=result["plan_id"],
@@ -59,6 +70,51 @@ def turn(session_id: UUID, payload: OrchestratorTurnIn, db: Session = Depends(ge
     except ValueError as e:
         if str(e) == "SESSION_NOT_FOUND":
             raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=400, detail="Bad request")
+
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Database error")
+
+@router.post(
+    "/file-intake-complete/{session_id}",
+    response_model=OrchestratorFileIntakeCompleteOut,
+)
+def file_intake_complete(
+    session_id: UUID,
+    payload: OrchestratorFileIntakeCompleteIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        result = complete_file_intake_turn(
+            db,
+            session_id=session_id,
+            uploaded_file_id=payload.uploaded_file_id,
+        )
+
+        return OrchestratorFileIntakeCompleteOut(
+            session_id=session_id,
+            assistant_message_id=result["assistant_msg"].id,
+            reply=result["reply"],
+            created_at=result["assistant_msg"].created_at,
+            active_step=result["active_step"],
+            interaction_mode=result["interaction_mode"],
+            confirmation_state=result["confirmation_state"],
+            cta_ready=result["cta_ready"],
+            plan_created=result["plan_created"],
+            plan_id=result["plan_id"],
+            plan_status=result["plan_status"],
+            ui_hints=result.get("ui_hints"),
+            ui_bullets=result.get("ui_bullets"),
+            ui_context=result.get("ui_context"),
+        )
+
+    except ValueError as e:
+        if str(e) == "SESSION_NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Session not found")
+        if str(e) == "UPLOADED_FILE_NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Uploaded file not found")
+        if str(e) == "UPLOADED_FILE_NOT_ACCEPTED":
+            raise HTTPException(status_code=400, detail="Uploaded file is not accepted")
         raise HTTPException(status_code=400, detail="Bad request")
 
     except SQLAlchemyError:
