@@ -7,8 +7,8 @@ UI_BULLETS_CATALOG = {
     "variant": "bullets",
     "items": [
       "Subir archivo desde tu computadora",
-      "Pegar texto directamente en el chat",
-      "Importar archivo desde Google Drive",
+#      "Pegar texto directamente en el chat",
+#      "Importar archivo desde Google Drive",
     ],
   },
 
@@ -25,4 +25,31 @@ UI_BULLETS_CATALOG = {
     "variant": "bullets",
     "items": ["PDF (.pdf)", "Word (.docx)"],
   },
+}
+
+SUPPORTED_INPUT_SOURCES = {
+#  "paste_text": "paste_text",
+#  "pegar texto": "paste_text",
+#  "texto en el chat": "paste_text",
+#  "chat": "paste_text",
+  "local_upload": "local_upload",
+  "subir archivo": "local_upload",
+  "archivo local": "local_upload",
+  "pending":"pending",
+  "pendiente":"pending",
+  "aun no lo tengo":"pending",
+  "aún no lo tengo":"pending",
+  "falta":"pending",
+ # "google drive": "google_drive",
+#  "gdrive": "google_drive",
+#  "drive": "google_drive",
+}
+
+SUPPORTED_OUTPUT_FORMATS = {
+  "pdf": "pdf",
+  ".pdf": "pdf",
+  "docx": "docx",
+  ".docx": "docx",
+  "word": "docx",
+  "word (.docx)": "docx",
 }

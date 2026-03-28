@@ -10,10 +10,14 @@ from app.db.models.orchestrator_message import OrchestratorMessage
 def create_session(db: Session, user_id: str | None = None) -> OrchestratorSession:
     s = OrchestratorSession(user_id=user_id)  # status/created_at/updated_at por default
     db.add(s)
-    db.commit()
-    db.refresh(s)
-    return s
 
+    try:
+        db.commit()
+        db.refresh(s)
+        return s
+    except Exception:
+        db.rollback()
+        raise
 
 def get_session(db: Session, session_id: str) -> OrchestratorSession | None:
     return db.get(OrchestratorSession, uuid.UUID(session_id))

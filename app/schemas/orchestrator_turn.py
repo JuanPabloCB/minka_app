@@ -39,14 +39,29 @@ class UIHintsOut(BaseModel):
 
 UIBulletsVariant = Literal["timeline", "bullets"]
 
+
 class UIBulletItem(BaseModel):
     key: str
     label: str
+
 
 class UIBulletsOut(BaseModel):
     title: str | None = None
     variant: UIBulletsVariant = "timeline"
     items: list[UIBulletItem] = Field(default_factory=list)
+
+
+# ---------- CONTEXTO ENTENDIDO POR MINKABOT ----------
+
+ResultType = Literal[
+    "highlighted_document",
+    "analysis_report",
+    "executive_summary",
+    "in_app_explanation",
+    "dashboard_view",
+]
+
+
 
 class UIContextOut(BaseModel):
     task_type: str | None = None
@@ -54,9 +69,32 @@ class UIContextOut(BaseModel):
     analysis_goal: str | None = None
     input_source: str | None = None
     input_file_name: str | None = None
-    output_format: str | None = None
+    uploaded_file_id: UUID | None = None
+    file_uploaded: bool | None = None
+    file_validation_status: str | None = None
+    output_format: str | None = None  # transicional / legacy
+    result_type: ResultType | None = None
     focus: list[str] = Field(default_factory=list)
-    
+
+
+# ---------- ESTADO DEL FLUJO ----------
+
+InteractionMode = Literal["free_text", "hint_required", "guided_options", "review_edit"]
+
+ActiveStep = Literal[
+    "goal_intent",
+    "document_type",
+    "analysis_goal",
+    "focus",
+    "input_source",
+    "file_intake",
+    "result_type",
+    "output_format",  # transicional / legacy
+    "confirmation",
+    "confirmation_edit",
+]
+
+ConfirmationState = Literal["none", "awaiting_confirmation", "editing"]
 
 
 # ---------- TURN OUT ----------
@@ -70,6 +108,11 @@ class OrchestratorTurnOut(BaseModel):
     reply: str
     created_at: datetime
 
+    # Estado del flujo
+    active_step: ActiveStep
+    interaction_mode: InteractionMode
+    confirmation_state: ConfirmationState = "none"
+
     # “Botón negro” (CTA)
     cta_ready: bool
 
@@ -78,15 +121,40 @@ class OrchestratorTurnOut(BaseModel):
     plan_id: UUID | None = None
     plan_status: str | None = None
 
-    # NUEVO: hints para UI (botones)
+    # hints para UI
     ui_hints: UIHintsOut = Field(default_factory=UIHintsOut)
 
-    # NUEVO: bullets para UI (lista / timeline)
+    # bullets para UI
     ui_bullets: UIBulletsOut | None = None
-    
-    #NUEVO: Contexto segun MinkaBot
+
+    # contexto según MinkaBot
     ui_context: UIContextOut | None = None
 
     class Config:
         from_attributes = True
-    
+
+class OrchestratorFileIntakeCompleteIn(BaseModel):
+    uploaded_file_id: UUID
+
+
+class OrchestratorFileIntakeCompleteOut(BaseModel):
+    session_id: UUID
+    assistant_message_id: UUID
+    reply: str
+    created_at: datetime
+
+    active_step: ActiveStep
+    interaction_mode: InteractionMode
+    confirmation_state: ConfirmationState = "none"
+
+    cta_ready: bool
+    plan_created: bool
+    plan_id: UUID | None = None
+    plan_status: str | None = None
+
+    ui_hints: UIHintsOut = Field(default_factory=UIHintsOut)
+    ui_bullets: UIBulletsOut | None = None
+    ui_context: UIContextOut | None = None
+
+    class Config:
+        from_attributes = True

@@ -10,6 +10,8 @@ from app.services.sessions_service import create_session, get_session, list_sess
 from app.schemas.orchestrator_messages import OrchestratorMessageCreate, OrchestratorMessageOut
 from app.services.orchestrator_messages_service import create_message
 
+import traceback
+
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
@@ -17,9 +19,17 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 def create(payload: SessionCreate, db: Session = Depends(get_db)):
     try:
         s = create_session(db, user_id=payload.user_id)
-        return SessionOut.model_validate(s)  # <- recomendado (ver schemas abajo)
-    except SQLAlchemyError:
+        return SessionOut.model_validate(s)
+    except SQLAlchemyError as e:
+        print("\n[SESSIONS CREATE] SQLAlchemyError:")
+        print(repr(e))
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Database error")
+    except Exception as e:
+        print("\n[SESSIONS CREATE] Unexpected error:")
+        print(repr(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Unexpected error")
 
 
 @router.get("/{session_id}", response_model=SessionOut)
